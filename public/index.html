@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Bubble Sheet</title>
+    <link rel="stylesheet" href="./css/style.css">
+    <link href="https://unpkg.com/tailwindcss@^1.0/dist/tailwind.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <div id="container" class="invisible">
+        <span>original image</span>
+        <img id="image" src="./images/gc_bubble_01.png" style="transform: scale(0.2)" hidden>
+        <canvas id="canvas" style="border: solid thin black; width:300px;height:240px;"></canvas>
+        <canvas class="center-block" id="canvasOutput"></canvas>
+
+    </div>
+    <script src="./libs/utils.js"></script>
+
+    <script src="./js/opencv_process.js"></script>
+    <script src="./js/gui.js"></script>
+
+    <script>
+        var featuresReady = checkFeatures(document.getElementById("info"), {
+            webrtc: true
+        });
+    </script>
+    <script src="./js/index.js"></script>
+    <script async src="./build/asm.js/opencv.js" onload="opencvIsReady()"></script>
+
+
+    <button onclick="onClickProcess()"
+        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded fixed right-0 top-0">Process</button>
+
+
+</body>
+
+</html>
