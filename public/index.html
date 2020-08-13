@@ -6,21 +6,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <title>Bubble Sheet</title>
     <link rel="stylesheet" href="./css/style.css">
-    <link href="https://unpkg.com/tailwindcss@^1.0/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="./css/tailwind.css">
 </head>
 
 <body>
     <div id="container" class="invisible">
         <span>original image</span>
-        <img id="image" src="./images/gc_bubble_01.png" style="transform: scale(0.2)" hidden>
-        <canvas id="canvas" style="border: solid thin black; width:300px;height:240px;"></canvas>
-        <canvas class="center-block" id="canvasOutput"></canvas>
+        
+
+        <div class="flex p-3">
+            <img id="image" src="./images/gc_bubble_01.png"  hidden>
+            <canvas id="canvas" class="w-64" ></canvas>
+        </div>
+
+        <div class="p-5">
+            <canvas id="canvasOutput"></canvas>
+        </div>
+
+        
+       
 
     </div>
     <script src="./libs/utils.js"></script>
-
-    <script src="./js/opencv_process.js"></script>
-    <script src="./js/gui.js"></script>
 
     <script>
         var featuresReady = checkFeatures(document.getElementById("info"), {
@@ -32,7 +39,7 @@
 
 
     <button onclick="onClickProcess()"
-        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded fixed right-0 top-0">Process</button>
+        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded fixed left-0 top-0">Process</button>
 
 
 </body>

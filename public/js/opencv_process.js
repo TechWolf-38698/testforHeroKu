@@ -32,10 +32,10 @@ function passThrough(src) {
   }
   
 
-function gray(src) {
-    cv.cvtColor(src, dstC1, cv.COLOR_RGBA2GRAY);
-    return dstC1;
-}
+// function gray(src) {
+//     cv.cvtColor(src, dstC1, cv.COLOR_RGBA2GRAY);
+//     return dstC1;
+// }
 
 function hsv(src) {
     cv.cvtColor(src, dstC3, cv.COLOR_RGBA2RGB);
