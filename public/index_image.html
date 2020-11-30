@@ -13,21 +13,23 @@
     <div id="container" class="invisible">
 
         <div>
-            <video id="video" autoplay="autoplay" playsinline class="absolute-position" style="width:200px;"></video>
+            <video id="video" autoplay="autoplay" playsinline class="absolute-position"></video>
         </div>
 
-        <div class="flex flex-row">
-
-            <div class="">
-                <canvas id="canvasOutput"></canvas>
-            </div>
-
-            <div class="">
-                <canvas id="preview"></canvas>
-            </div>
-
-        </div>
+        <span>original image</span>
         
+
+        <div class="flex p-3">
+            <img id="image" src="./images/rect.png"  hidden>
+            <canvas id="canvas" class="w-164" ></canvas>
+        </div>
+
+        <div class="p-5">
+            <canvas id="canvasOutput"></canvas>
+        </div>
+
+        
+       
 
     </div>
     <script src="./libs/utils.js"></script>
@@ -49,7 +51,7 @@
 
 
     <button onclick="onClickProcess()"
-        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded fixed right-0 top-0">Process</button>
+        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded fixed left-0 top-0">Process</button>
 
 
 </body>
