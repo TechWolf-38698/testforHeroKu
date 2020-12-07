@@ -4,8 +4,16 @@ let height = 0;
 let vc = null;
 
 let container = document.getElementById('container');
+let canvasOutput = document.getElementById('canvas');
+let canvasOutputCtx = canvasOutput.getContext('2d');
 
-let canvasOutput;
+let canvasInput = null;
+let canvasInputCtx = null;
+
+let canvasBuffer = null;
+let canvasBufferCtx = null;
+
+let video;
 
 let stream = null;
 let videoCapture = null;
@@ -13,12 +21,14 @@ let videoCapture = null;
 let src = null;
 let dstC1 = null;
 let preProcessedSrc = null;
+let roiSrc = null;
+let bubbleSrc = null;
 
 let preview;
 
 
 function startCamera() {
-    const video = document.getElementById("video");
+    video = document.getElementById("video");
 
     const videoCanvas = document.getElementById("video-canvas");
 
@@ -49,8 +59,11 @@ function startCamera() {
         width = video.videoWidth;
         video.setAttribute("width", width);
         video.setAttribute("height", height);
+        canvasOutput.width = video.videoWidth;
+        canvasOutput.height = video.videoHeight;
+
         //     streaming = true;
-        videoCapture = new cv.VideoCapture(video);
+        // videoCapture = new cv.VideoCapture(video);
         // }
         startVideoProcessing();
     }, false);
@@ -60,6 +73,16 @@ function startCamera() {
 function startVideoProcessing() {
     stopVideoProcessing();
 
+    canvasInput = document.createElement('canvas');
+    canvasInput.width = width;
+    canvasInput.height = height;
+    canvasInputCtx = canvasInput.getContext('2d');
+
+    canvasBuffer = document.createElement('canvas');
+    canvasBuffer.width = width;
+    canvasBuffer.height = height;
+    canvasBufferCtx = canvasBuffer.getContext('2d');
+
     src = new cv.Mat(height, width, cv.CV_8UC4);
     preProcessedSrc = new cv.Mat(height, width, cv.CV_8UC1);
 
@@ -67,43 +90,42 @@ function startVideoProcessing() {
 }
 
 function stopVideoProcessing() {
-    (src && !src.isDeleted()) && src.delete();
+    src && !src.isDeleted() && src.delete();
     preProcessedSrc && !preProcessedSrc.isDeleted() && preProcessedSrc.delete();
     preview && !preview.isDeleted() && preview.delete();
-
-    // src = null;
-    // preview = null;
 }
 
 function processVideo() {
 
-    videoCapture.read(src);
-
-    // preview  = src;
+    canvasInputCtx.drawImage(video, 0, 0, width, height);
+    let imageData = canvasInputCtx.getImageData(0, 0, width, height);
+    src.data.set(imageData.data);
 
     preview = src.clone()
 
     const result = process(src);
 
-    // cv.imshow("canvasOutput", src);
-
     if (result) {
-        cv.imshow("canvasOutput", result);
+        cv.imshow("canvas", result);
 
-        // result && !result.isDeleted() && result.delete();
+        if (result !== src) {
+            result && !result.isDeleted() && result.delete();
+        }
     } else {
-        cv.imshow("canvasOutput", preProcessedSrc)
+        cv.imshow("canvas", preProcessedSrc)
     }
 
     if (preview) {
         cv.imshow("preview", preview)
+        preview && !preview.isDeleted() && preview.delete();
     }
 
     requestAnimationFrame(processVideo);
 }
 
 function onClickProcess() {
-    startCamera();
+    opencvIsReady()
+    // startCamera();
 }
 
 
@@ -113,19 +135,23 @@ let detectingBubbles = false;
 
 
 function process(src) {
-
+    let st = Date.now();
     cv.cvtColor(src, preProcessedSrc, cv.COLOR_RGBA2GRAY);
 
-    cv.erode(preProcessedSrc, preProcessedSrc, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
-    cv.dilate(preProcessedSrc, preProcessedSrc, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
+    // cv.erode(preProcessedSrc, preProcessedSrc, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
+    // cv.dilate(preProcessedSrc, preProcessedSrc, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
+    // cv.dilate(src, dst, M, anchor, 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
 
 
     // return preProcessedSrc;
 
-    cv.GaussianBlur(preProcessedSrc, preProcessedSrc, {
-        width: 3,
-        height: 3
-    }, 0, 0, cv.BORDER_DEFAULT);
+
+    // // return preProcessedSrc;
+
+    // cv.GaussianBlur(preProcessedSrc, preProcessedSrc, {
+    //     width: 3,
+    //     height: 3
+    // }, 0, 0, cv.BORDER_DEFAULT);
 
     // cv.threshold(preProcessedSrc, preProcessedSrc, 150, 255, cv.THRESH_BINARY)
     // cv.blur(preProcessedSrc, preProcessedSrc, new cv.Size(5, 5))
@@ -135,17 +161,18 @@ function process(src) {
     // cv.bitwise_not(preProcessedSrc, preProcessedSrc)
 
 
-
     const points = findBubbleRegion3(preProcessedSrc);
+
+    // return;
 
 
     if (!points) {
         if (detectedForm) {
             breakCount++;
 
-            if (breakCount > 30) {
+            if (breakCount > 13) {
                 detectedForm = null;
-                console.log('no roi break');
+                console.log('!!! no roi break');
             } else {
                 console.log('no roi continue')
                 drawBubbleRegion(detectedForm.points);
@@ -159,9 +186,9 @@ function process(src) {
 
 
 
-    if (detectedForm || detectingBubbles) {
-        return;
-    }
+    // if (detectedForm || detectingBubbles) {
+    //     return;
+    // }
 
     breakCount = 0;
     detectedForm = {
@@ -171,32 +198,52 @@ function process(src) {
 
     drawBubbleRegion(points);
 
-    // return preProcessedSrc
 
-    // return preProcessedSrc
-
-    // return;
-
-
-    detectingBubbles = true;
-    console.log('processing')
+    // if (detectingBubbles) {
+    //     return;
+    // }
 
 
     /**
      * 检测到 ROI
      */
-    const ready = extractRoi(preProcessedSrc, points);
+    const ready = extractRoi(preProcessedSrc, points, preProcessedSrc);
 
 
-    cv.adaptiveThreshold(ready, ready, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 35, 3);
+    cv.erode(ready, ready, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
+    cv.dilate(ready, ready, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
 
-    return ready;
+
+    // cv.threshold(ready, ready, 150, 255, cv.THRESH_BINARY)
+    // cv.blur(ready, ready, new cv.Size(5, 5))
+
+    cv.adaptiveThreshold(ready, ready, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 9, 1);
+
+    cv.GaussianBlur(ready, ready, {
+        width: 5,
+        height: 5
+    }, 0, 0, cv.BORDER_DEFAULT);
+
+    cv.bitwise_not(ready, ready)
+
 
     const result = processBubbleRegion(ready);
 
     detectingBubbles = false;
+    ready && !ready.isDeleted() && ready.delete();
+
+    console.log('TIME: ', Date.now() - st)
 
     return result
+}
+
+// var worker = new Worker('js/worker.js');
+
+function processInWorker(mat) {
+    worker.postMessage({
+        mat,
+        cv: cv.threshold
+    })
 }
 
 /**
@@ -222,8 +269,8 @@ function extractRoi(mat, points, originSrc) {
 
     const result = perspectiveTransform(mat, points)
 
-    const roi = cropRoi(result.warped, result.width, result.height)
 
+    const roi = crop(result.warped, 0, 0, result.width, result.height, 2);
 
     let readySrc = new cv.Mat();
 
@@ -233,12 +280,16 @@ function extractRoi(mat, points, originSrc) {
     // 截取原图
     if (originSrc) {
         const srcTransformResult = perspectiveTransform(originSrc, points)
-        const srcRoi = cropRoi(srcTransformResult.warped, srcTransformResult.width, srcTransformResult.height)
-        cv.resize(srcRoi, srcRoi, new cv.Size(destWidth, Math.floor(destWidth * result.height / result.width)));
-        // preview = srcRoi
+        const srcRoi = crop(srcTransformResult.warped, 0, 0, srcTransformResult.width, srcTransformResult.height, 2);
+        cv.resize(srcRoi, preview, new cv.Size(destWidth, Math.floor(destWidth * result.height / result.width)));
+
+        srcRoi.delete();
+        srcTransformResult.warped.delete();
+
     }
 
     result.warped.delete();
+    roi.delete()
 
     return readySrc
 }
@@ -246,15 +297,20 @@ function extractRoi(mat, points, originSrc) {
 
 function processBubbleRegion(readySrc) {
 
+
     cv.threshold(readySrc, readySrc, 100, 255, cv.THRESH_BINARY | cv.THRESH_BINARY_INV)
     // cv.adaptiveThreshold(readySrc, readySrc, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 5, 3);
     cv.bitwise_not(readySrc, readySrc)
 
 
-    const lines = findSeparatorLines(readySrc);
-
+    const lines = findSeparatorLines(readySrc); // about 30 ms
 
     if (!lines || !lines.length) {
+        return
+    }
+
+    if (lines[0][0].y < 300) {
+        console.log('可能倒置')
         return
     }
 
@@ -285,10 +341,7 @@ function processBubbleRegion(readySrc) {
         detectBubbles(readySrc, lines[i][0].y, structure[i]);
     }
 
-
     console.log("%c 识别到了", "color:red;font-weight:bold;font-size:20px")
-
-    readySrc.delete();
 }
 
 
@@ -296,37 +349,49 @@ function detectBubbles(src, baseY, structure) {
 
     const unit = getBubbleUnit();
 
+    let error = false;
+
     let lastGroupMaxX = unit.group_left_margin;
+    
+    columns:
     for (let i = 0; i < structure.length; i++) {
         let group = structure[i];
 
         let marginLeft = lastGroupMaxX + (i === 0 ? 0 : unit.group_gap);
 
+        question:
         for (let j = 0; j < group.length; j++) {
             let row = group[j];
 
             let y = baseY + unit.group_top_margin + j * unit.height + j * unit.v_gap
 
+            options:
             for (let k = 0; k < row.length; k++) {
                 let x = marginLeft + k * unit.width + k * unit.h_gap
 
+                if (x <= 0 || y <= 0 || x + unit.width >= 800 || y + unit.height >= src.rows) {
+                    error = true
+                    break columns;
+                }
+
                 const filled = decideBubbleRegionFilled({
-                    points: [new cv.Point(x, y),
-                        new cv.Point(x + unit.width, y),
-                        new cv.Point(x + unit.width, y + unit.height)
-                    ]
+                    rect: {
+                        x: x,
+                        y: y,
+                        width: unit.width,
+                        height: unit.height
+                    }
                 }, src);
 
                 lastGroupMaxX = Math.max(x + unit.width, lastGroupMaxX);
 
                 const color = filled ? [0, 255, 0, 255] : [255, 0, 255, 255]
 
-                // cv.rectangle(preview, new cv.Point(x, y), new cv.Point(x + unit.width, y + unit.height), color, cv.LINE_4);
+                cv.rectangle(preview, new cv.Point(x, y), new cv.Point(x + unit.width, y + unit.height), color, cv.LINE_4);
 
             }
         }
     }
-
 
 }
 
@@ -380,15 +445,11 @@ function decideFilledBubbles(bubbles, src) {
 
 
 function decideBubbleRegionFilled(region, src) {
-    const mask = cv.Mat.zeros(src.size(), cv.CV_8UC1);
 
-    cv.rectangle(mask, region.points[0], region.points[2], [255, 255, 255, 255], cv.FILLED);
+    let b = src.roi(region.rect)
+    const noneZero = cv.countNonZero(b)
 
-    const conjuction = new cv.Mat(src.size(), cv.CV_8UC1);
-
-    cv.bitwise_and(src, mask, conjuction)
-
-    const noneZero = cv.countNonZero(conjuction)
+    b.delete()
 
     let base = getBubbleUnit().area;
 
@@ -415,24 +476,23 @@ function getBubbleUnit() {
     }
 }
 
-function findSeparatorLines2(src) {
-    const mat = src.clone();
+// function findSeparatorLines2(src) {
+//     const mat = src.clone();
 
-    const size = mat.cols / 3;
+//     const size = mat.cols / 3;
 
-    const structure = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(size, 1));
+//     const structure = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(size, 1));
 
-    cv.erode(mat, mat, structure, new cv.Point(-1, -1));
-    cv.dilate(mat, mat, structure, new cv.Point(-1, -1));
+//     cv.erode(mat, mat, structure, new cv.Point(-1, -1));
+//     cv.dilate(mat, mat, structure, new cv.Point(-1, -1));
 
-    return findSeparatorLines(mat);
-}
+//     return findSeparatorLines(mat);
+// }
 
 function findSeparatorLines(src) {
 
-    let canny = new cv.Mat();
-
-    cv.Canny(src, canny, 50, 150, 3); // 启动的话，line 会分段
+    // let canny = new cv.Mat();
+    // cv.Canny(src, canny, 50, 150, 3); // 启动的话，line 会分段
 
     let lines = new cv.Mat();
 
@@ -489,11 +549,13 @@ function findSeparatorLines(src) {
 
     for (let i = 0; i < arr.length; i++) {
         const line = arr[i];
-        preview && cv.line(preview, line[0], line[1], contoursColor[i], 3, cv.LINE_AA);
+        preview && cv.line(preview, line[0], line[1], [0, 0, 255, 255], 3, cv.LINE_AA);
     }
 
 
-    console.log('lines count:', lines.rows, arr.length)
+    // console.log('lines count:', lines.rows, arr.length)
+
+    lines.delete();
 
     return arr;
 }
@@ -639,10 +701,17 @@ function findBubbleRegion2(src) {
 
 
 function findBubbleRegion3(src) {
-    let mat = new cv.Mat(src.cols, src.rows, cv.CV_8UC1);
-    // let mat = src;
+    let mat = new cv.Mat(src.size(), cv.CV_8UC1);
 
-    cv.adaptiveThreshold(src, mat, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 11, 2);
+    cv.erode(src, mat, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
+    cv.dilate(mat, mat, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
+
+    cv.GaussianBlur(mat, mat, {
+        width: 3,
+        height: 3
+    }, 0, 0, cv.BORDER_DEFAULT);
+
+    cv.adaptiveThreshold(mat, mat, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 11, 2);
 
     // cv.GaussianBlur(src, mat, { width: 5, height: 5 }, 0, 0, cv.BORDER_DEFAULT);
 
@@ -650,9 +719,33 @@ function findBubbleRegion3(src) {
     // cv.Canny(src, mat, 160, 20);
 
     // cv.adaptiveThreshold(mat, mat, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 35, 2);
-   
 
-    function sortContourFunc(a, b) {
+
+    let contours = new cv.MatVector();
+    let hierarchy = new cv.Mat();
+    cv.findContours(mat, contours, hierarchy, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE);
+
+    
+
+    const contourAreaArray = [];
+
+    // console.log(contours, contours.get(5), contours[5])
+
+    const minArea = width * height / 8 / 2
+    for (let i = 0; i < contours.size(); i++) {
+        const cnt = contours.get(i);
+        const area = cv.contourArea(cnt, false)
+        if (area > minArea) {
+            contourAreaArray.push({
+                area,
+                index: i
+            })
+        }
+
+        cnt.delete()
+    }
+
+    contourAreaArray.sort((a, b) => {
         /* Sort largest value first */
         if (a.area < b.area) {
             return 1
@@ -660,33 +753,18 @@ function findBubbleRegion3(src) {
             return -1
         }
         return 0
-    }
+    })
 
-    let contours = new cv.MatVector();
-    let hierarchy = new cv.Mat();
-    cv.findContours(mat, contours, hierarchy, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE);
+    cv.drawContours(preview, contours, -1, [255, 0, 0, 255], 1)
 
 
-    const contourAreaArray = [];
+    // contours.delete();
+    // hierarchy.delete();
+    // mat.delete()
 
-    const minArea = width * height / 8
-    for (let i = 0; i < contours.size(); i++) {
-        const cnt = contours.get(i);
-        const area = cv.contourArea(cnt, false)
-        if (area < minArea) {
-            continue
-        }
+    // console.log(contourAreaArray)
 
-        contourAreaArray.push({
-            area,
-            index: i
-        })
-    }
-
-    contourAreaArray.sort(sortContourFunc)
-
-
-    const possibleRectangles = {};
+    const possibleRectangles = [];
 
     let p = new cv.MatVector();
 
@@ -701,26 +779,27 @@ function findBubbleRegion3(src) {
             const points = checkApproxIsRectangle(approx)
 
             if (points) {
-                possibleRectangles[cntArea.index] = cnt;
+                possibleRectangles.push(cntArea.index);
 
                 p.push_back(cnt);
             }
         }
 
         approx.delete()
+        cnt.delete()
 
-        if (Object.keys(possibleRectangles).length >= 8) {
+        if (possibleRectangles.length >= 8) {
             break;
         }
     }
 
-    cv.drawContours(preview, p, -1, [255, 0, 0, 255], 1)
+    cv.drawContours(preview, p, -1, [0, 255, 0, 255], 1)
 
     p.delete()
 
-    for (let i in possibleRectangles) {
+    let targetPoints
 
-        const rectangle = possibleRectangles[i];
+    for (let i of possibleRectangles) {
 
         let index = +i;
 
@@ -743,27 +822,31 @@ function findBubbleRegion3(src) {
         // if (hierarchy.intPtr(0, k)[2] != -1) c ++;
 
         if (c >= 1) {
+            const cnt = contours.get(index);
 
-            const peri = cv.arcLength(contours.get(index), true)
+            const peri = cv.arcLength(cnt, true)
             let approx = new cv.Mat();
-            cv.approxPolyDP(contours.get(index), approx, peri * 0.02, true)
+            cv.approxPolyDP(cnt, approx, peri * 0.02, true)
 
             const points = checkApproxIsRectangle(approx)
 
             approx.delete()
+            cnt.delete()
 
             if (points) {
-                return points;
+                targetPoints = points
+                break
             }
-            break;
+            // break;
         }
 
     }
 
     contours.delete();
     hierarchy.delete();
+    mat.delete()
 
-    return
+    return targetPoints
 }
 
 function checkApproxIsRectangle(approx) {
@@ -809,8 +892,11 @@ function checkIsRectangle(points) {
     //     (tr.y - tl.y) / (br.y - bl.y) < 0.3)
 
     if (
+        (tr.x - tl.x >= width - 10) ||
+        br.x - bl.x >= width - 10 ||
+        br.y - tr.y >= height - 10 ||
         tr.x - tl.x <= width / 20 ||
-        Math.abs(tr.y - tl.y) >= height / 2||
+        Math.abs(tr.y - tl.y) >= height / 2 ||
         br.x - tr.x >= 300 ||
         Math.abs(br.y - tr.y) <= height / 5 ||
         br.x - bl.x < width / 5 ||
@@ -1032,11 +1118,6 @@ function perspectiveTransform(src, pts) {
 
 }
 
-function cropRoi(src, width, height, padding = 2) {
-
-    return crop(src, 0, 0, width, height, padding);
-}
-
 function crop(src, x, y, width, height, padding = 5) {
 
     let warpSize = src.size()
@@ -1047,9 +1128,7 @@ function crop(src, x, y, width, height, padding = 5) {
         Math.min(warpSize.height, height) - padding * 2
     )
 
-    let dst = cv.Mat.zeros(rect.width, rect.height, cv.CV_8UC3)
-    dst = src.roi(rect)
-    return dst;
+    return src.roi(rect);
 }
 
 function sortCorners(pts) {
@@ -1161,4 +1240,17 @@ function opencvIsReady() {
     }
     container.className = '';
     // loadImage()
+
+    // init threads number 
+    // cv.parallel_pthreads_set_threads_num(1);
+
+    // cv.parallel_pthreads_set_threads_num(4);
+
+    cv().then(res => {
+        cv = res;
+
+        startCamera();
+    })
+
+    
 }

@@ -7,19 +7,22 @@
     <title>Bubble Sheet</title>
     <link rel="stylesheet" href="./css/style.css">
     <link rel="stylesheet" href="./css/tailwind.css">
+    <script src="https://unpkg.com/wasm-feature-detect/dist/umd/index.js"></script>
 </head>
 
 <body>
-    <div id="container" class="invisible">
+    <div id="container" class="">
 
         <div>
             <video id="video" autoplay="autoplay" playsinline class="absolute-position" style="width:200px;"></video>
         </div>
 
+        <canvas style="position:fixed; left:-1000px; visibility: hidden" id="dummy"></canvas>
+
         <div class="flex flex-row">
 
             <div class="">
-                <canvas id="canvasOutput"></canvas>
+                <canvas id="canvas"></canvas>
             </div>
 
             <div class="">
@@ -27,31 +30,52 @@
             </div>
 
         </div>
-        
+
 
     </div>
     <script src="./libs/utils.js"></script>
+    <!-- <script src="./js/newbuild/loader.js"></script> -->
+   
+    <!-- <script src="./js/34/cv.js"></script> -->
+
 
     <script>
         var featuresReady = checkFeatures(document.getElementById("info"), {
             webrtc: true
         });
     </script>
-    <script src="./js/index.js"></script>
+
     <script>
         var Module = {
-          wasmBinaryFile: './build/wasm/opencv_js.wasm',
-          _main: function() {opencvIsReady();}
+        //   wasmBinaryFile: './build/wasm/opencv_js.wasm',
+          _main: function() {},
+          onRuntimeInitialized: function() {opencvIsReady();}
         };
+
+        // Set paths configuration
+        let pathsConfig = {
+            wasm: "./js/newbuild/opencv.js",
+            threads: "./js/newbuild/opencv_js.js",
+            // simd: "../../build_simd/opencv.js",
+            // threadsSimd: "../../build_mtSIMD/opencv.js",
+        }
+        // Load OpenCV.js and use the pathsConfiguration and main function as the params.
+        // loadOpenCV(pathsConfig, () => {
+        //     console.log('LOADED')
+        //     opencvIsReady();
+        // });
     </script>
-    <script async src="./build/wasm/opencv.js"></script>
+    <!-- <script async src="./js/newbuild/opencv_threads.js" ></script> -->
     <!-- <script async src="./build/asm.js/opencv.js" onload="opencvIsReady()"></script> -->
+
+    <script async="" type="text/javascript" src="./js/build_with_only_2_lib/opencv_js.js"></script>
 
 
     <button onclick="onClickProcess()"
         class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded fixed right-0 top-0">Process</button>
 
 
+        <script src="./js/index.js"></script>
 </body>
 
 </html>
