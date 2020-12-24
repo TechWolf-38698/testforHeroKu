@@ -26,6 +26,26 @@ let bubbleSrc = null;
 
 let preview;
 
+const structure = [
+    [
+        ['1010', '0000', '0001', '1111', '0000'],
+        ['0010', '0100', '0010', '0001', '1000']
+    ],
+    [
+        ['1010', '00010', '000001', '1111', '0000'],
+        ['0010', '0100', '0010', '0001', '1000']
+    ],
+    [
+        ['1010', '0000', '0001', '1111', '0000'],
+        ['0010', '0100', '0010', '0001', '1000'],
+        ['0010', '0100', '0010', '0001', '1000']
+    ],
+    [
+        ['0010', '0100', '0010', '0001', '1000']
+    ]
+]
+
+
 
 function startCamera() {
     video = document.getElementById("video");
@@ -33,16 +53,16 @@ function startCamera() {
     const videoCanvas = document.getElementById("video-canvas");
 
     navigator.mediaDevices.getUserMedia({
-            video: {
-                width: {
-                    exact: 640
-                },
-                height: {
-                    exact: 480
-                }
+        video: {
+            width: {
+                exact: 640
             },
-            audio: false
-        })
+            height: {
+                exact: 480
+            }
+        },
+        audio: false
+    })
         .then(function (s) {
             stream = s;
             video.srcObject = s;
@@ -138,32 +158,7 @@ function process(src) {
     let st = Date.now();
     cv.cvtColor(src, preProcessedSrc, cv.COLOR_RGBA2GRAY);
 
-    // cv.erode(preProcessedSrc, preProcessedSrc, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
-    // cv.dilate(preProcessedSrc, preProcessedSrc, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
-    // cv.dilate(src, dst, M, anchor, 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
-
-
-    // return preProcessedSrc;
-
-
-    // // return preProcessedSrc;
-
-    // cv.GaussianBlur(preProcessedSrc, preProcessedSrc, {
-    //     width: 3,
-    //     height: 3
-    // }, 0, 0, cv.BORDER_DEFAULT);
-
-    // cv.threshold(preProcessedSrc, preProcessedSrc, 150, 255, cv.THRESH_BINARY)
-    // cv.blur(preProcessedSrc, preProcessedSrc, new cv.Size(5, 5))
-
-    // cv.adaptiveThreshold(preProcessedSrc, preProcessedSrc, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 11, 2);
-
-    // cv.bitwise_not(preProcessedSrc, preProcessedSrc)
-
-
     const points = findBubbleRegion3(preProcessedSrc);
-
-    // return;
 
 
     if (!points) {
@@ -203,29 +198,61 @@ function process(src) {
     //     return;
     // }
 
+    // return ;
+
 
     /**
      * 检测到 ROI
      */
     const ready = extractRoi(preProcessedSrc, points, preProcessedSrc);
 
+    const lines = findSeparatorLines(ready);
 
-    cv.erode(ready, ready, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
-    cv.dilate(ready, ready, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
+    if (!lines || !lines.length) {
+        return
+    }
+
+    if (lines[0][0].y < 300) {
+        console.log('可能倒置')
+        return
+    }
 
 
-    // cv.threshold(ready, ready, 150, 255, cv.THRESH_BINARY)
+    if (lines.length < structure.length) {
+        console.log('答题卡结构不匹配')
+        return;
+    }
+
+
+    const height = lines.length * 230 + lines.length * 2 + 455
+
+    const destWidth = 800;
+    cv.resize(ready, ready, new cv.Size(destWidth, height));
+    cv.resize(preview, preview, new cv.Size(destWidth, height));
+
+
+    // return ready;
+
+    // cv.erode(ready, ready, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3)));
+    // cv.dilate(ready, ready, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
+
+    // cv.threshold(ready, ready, 120, 255, cv.THRESH_BINARY)
     // cv.blur(ready, ready, new cv.Size(5, 5))
+// 
+    // cv.adaptiveThreshold(ready, ready, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 11, 3);
 
-    cv.adaptiveThreshold(ready, ready, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 9, 1);
+    // cv.GaussianBlur(ready, ready, {
+    //     width:3,
+    //     height: 3
+    // }, 0, 0, cv.BORDER_DEFAULT);
+    
+    // cv.adaptiveThreshold(ready, ready, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 15, 3);
 
-    cv.GaussianBlur(ready, ready, {
-        width: 5,
-        height: 5
-    }, 0, 0, cv.BORDER_DEFAULT);
 
-    cv.bitwise_not(ready, ready)
+    // cv.bitwise_not(ready, ready)
+    // return ready;
 
+    // preview = ready.clone();
 
     const result = processBubbleRegion(ready);
 
@@ -269,6 +296,7 @@ function extractRoi(mat, points, originSrc) {
 
     const result = perspectiveTransform(mat, points)
 
+    // return result.warped;
 
     const roi = crop(result.warped, 0, 0, result.width, result.height, 2);
 
@@ -296,14 +324,14 @@ function extractRoi(mat, points, originSrc) {
 
 
 function processBubbleRegion(readySrc) {
-
-
-    cv.threshold(readySrc, readySrc, 100, 255, cv.THRESH_BINARY | cv.THRESH_BINARY_INV)
-    // cv.adaptiveThreshold(readySrc, readySrc, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 5, 3);
-    cv.bitwise_not(readySrc, readySrc)
-
-
     const lines = findSeparatorLines(readySrc); // about 30 ms
+
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        preview && cv.line(preview, line[0], line[1], [0, 0, 255, 255], 3, cv.LINE_AA);
+    }
+
 
     if (!lines || !lines.length) {
         return
@@ -334,25 +362,65 @@ function processBubbleRegion(readySrc) {
     ]
 
     if (lines.length != structure.length) {
+        console.log('答题卡结构不匹配')
         return;
     }
 
+
+    // cv.erode(ready, ready, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
+    // cv.dilate(ready, ready, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
+
+    // cv.threshold(ready, ready, 150, 255, cv.THRESH_BINARY)
+    // cv.blur(ready, ready, new cv.Size(5, 5))
+
+    cv.threshold(readySrc, readySrc, 130, 255, cv.THRESH_BINARY)
+
+    // cv.adaptiveThreshold(ready, ready, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 11, 3);
+
+    // cv.GaussianBlur(readySrc, readySrc, {
+    //     width:3,
+    //     height: 3
+    // }, 0, 0, cv.BORDER_DEFAULT);
+    
+    // cv.adaptiveThreshold(ready, ready, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 11, 3);
+
+   
+
+        // cv.threshold(ready, ready, 100, 255, cv.THRESH_BINARY | cv.THRESH_BINARY_INV)
+    // cv.adaptiveThreshold(readySrc, readySrc, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 5, 3);
+    cv.bitwise_not(readySrc, readySrc)
+
+    // preview = readySrc.clone() 
+
+
     for (let i = 0; i < structure.length; i++) {
-        detectBubbles(readySrc, lines[i][0].y, structure[i]);
+        let height;
+        if (!lines[i + 1]) {
+            height = readySrc.rows - lines[i][0].y;
+        } else {
+            height = lines[i + 1][0].y - lines[i][0].y;
+        }
+
+        const region = crop(readySrc, 0, lines[i][0].y, readySrc.cols, height , 0);
+        cv.resize(region, region, new cv.Size(readySrc.cols, 230));
+
+        detectBubbles(region, 0, structure[i], lines[i][0].y);
+
+        region.delete()
     }
 
     console.log("%c 识别到了", "color:red;font-weight:bold;font-size:20px")
 }
 
 
-function detectBubbles(src, baseY, structure) {
+function detectBubbles(src, baseY, structure, previewY) {
 
     const unit = getBubbleUnit();
 
     let error = false;
 
     let lastGroupMaxX = unit.group_left_margin;
-    
+
     columns:
     for (let i = 0; i < structure.length; i++) {
         let group = structure[i];
@@ -385,10 +453,17 @@ function detectBubbles(src, baseY, structure) {
 
                 lastGroupMaxX = Math.max(x + unit.width, lastGroupMaxX);
 
-                const color = filled ? [0, 255, 0, 255] : [255, 0, 255, 255]
+                // const color = filled ? [0, 255, 0, 255] : [255, 0, 255, 255]
+                const color = filled ? [255, 255, 255, 255] : [0, 0, 0, 255]
 
-                cv.rectangle(preview, new cv.Point(x, y), new cv.Point(x + unit.width, y + unit.height), color, cv.LINE_4);
+                if (filled) {
+                    cv.circle(preview, new cv.Point(x + 10, 4 + y + previewY), 10, color, 2, cv.LINE_4);
 
+                } else {
+                    cv.rectangle(preview, new cv.Point(x, y + previewY), new cv.Point(x + unit.width, y + previewY + unit.height), color, 2, cv.LINE_4);
+
+                }
+                
             }
         }
     }
@@ -446,7 +521,16 @@ function decideFilledBubbles(bubbles, src) {
 
 function decideBubbleRegionFilled(region, src) {
 
-    let b = src.roi(region.rect)
+    // const rect = {
+    //     x: region.rect.x + 1,
+    //     y: region.rect.y + 1,
+    //     width: region.rect.width - 2,
+    //     height: region.rect.height - 2
+    // }
+
+    const rect = region.rect;
+
+    let b = src.roi(rect)
     const noneZero = cv.countNonZero(b)
 
     b.delete()
@@ -461,48 +545,48 @@ function decideBubbleRegionFilled(region, src) {
 function getBubbleUnit() {
 
     return {
-        width: 32,
-        height: 18,
+        width: 35,
+        height: 20,
         area: 576,
 
-        group_top_margin: 40,
-        group_left_margin: 62,
+        group_top_margin: 35,
+        group_left_margin: 70,
         group_bottom_margin: 60,
 
-        group_gap: 84,
+        group_gap: 75,
 
-        h_gap: 14,
-        v_gap: 18,
+        h_gap: 8,
+        v_gap: 11,
     }
 }
 
-// function findSeparatorLines2(src) {
-//     const mat = src.clone();
-
-//     const size = mat.cols / 3;
-
-//     const structure = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(size, 1));
-
-//     cv.erode(mat, mat, structure, new cv.Point(-1, -1));
-//     cv.dilate(mat, mat, structure, new cv.Point(-1, -1));
-
-//     return findSeparatorLines(mat);
-// }
-
 function findSeparatorLines(src) {
+
+    let mat = new cv.Mat(src.size(), cv.CV_8UC1);
+
+
+    cv.erode(src, mat, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
+    cv.dilate(mat, mat, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
+
+    cv.GaussianBlur(mat, mat, {
+        width:3,
+        height: 3
+    }, 0, 0, cv.BORDER_DEFAULT);
+    
+    cv.adaptiveThreshold(mat, mat, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 11, 3);
+
+    cv.bitwise_not(mat, mat)
+
 
     // let canny = new cv.Mat();
     // cv.Canny(src, canny, 50, 150, 3); // 启动的话，line 会分段
 
     let lines = new cv.Mat();
 
-    // cv.GaussianBlur(src, src, { width: 5, height: 5 }, 0, 0, cv.BORDER_DEFAULT);
-
-
     /**
-     * TODO: line 长度需大雨 整个宽度的 1/2
+     * TODO: line 长度需大于 整个宽度的 1/2
      */
-    cv.HoughLinesP(src, lines, 1, Math.PI / 2, 80, src.cols * 1 / 3, 3)
+    cv.HoughLinesP(mat, lines, 1, Math.PI / 2, 80, src.cols * 1 / 3, 3)
 
     if (lines.rows === 0) {
         // TODO: 使用其他途径再次查找 line
@@ -529,7 +613,7 @@ function findSeparatorLines(src) {
         if (existedIndex >= 0) { // merge lines
             const existed = arr[existedIndex];
             arr[existedIndex] = [new cv.Point(Math.min(sx, existed[0].x), existed[0].y),
-                new cv.Point(Math.max(ex, existed[1].x), existed[0].y)
+            new cv.Point(Math.max(ex, existed[1].x), existed[0].y)
             ]
 
         } else {
@@ -540,212 +624,68 @@ function findSeparatorLines(src) {
         }
     }
 
-    arr = arr.filter(item => item[1].x - item[0].x >= src.cols * 2 / 3)
+    arr = arr.filter(item => item[0].y >= 10 && item[1].x - item[0].x >= src.cols * 2 / 3)
 
     arr.sort((a, b) => {
         if (a[0].y > b[0].y) return 1;
         return -1;
     })
 
-    for (let i = 0; i < arr.length; i++) {
-        const line = arr[i];
-        preview && cv.line(preview, line[0], line[1], [0, 0, 255, 255], 3, cv.LINE_AA);
-    }
-
 
     // console.log('lines count:', lines.rows, arr.length)
 
     lines.delete();
+    mat.delete();
 
     return arr;
-}
-
-
-function findBubbleRegion2(src) {
-    let mat = src //new cv.Mat(height, width, cv.CV_8UC1);
-
-    // cv.GaussianBlur(src, mat, { width: 1, height: 1 }, 0, 0, cv.BORDER_DEFAULT);
-
-    // cv.adaptiveThreshold(mat, mat, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 35, 3);
-
-    // cv.bitwise_not(mat, mat)
-
-    // let canny = new cv.Mat();
-
-    // cv.Canny(src, canny, 5, controls.cannyThreshold2, controls.cannyApertureSize, controls.cannyL2Gradient);
-
-    // cv.dilate(dstC1, dstC1, new cv.Mat(), {x: -1, y: -1})
-
-    // get the contour with four sides
-
-    function sortContourFunc(a, b) {
-        /* Sort largest value first */
-        if (a.area < b.area) {
-            return 1
-        } else if (a.area > b.area) {
-            return -1
-        }
-        return 0
-    }
-
-    let contours = new cv.MatVector();
-    let hierarchy = new cv.Mat();
-    cv.findContours(mat, contours, hierarchy, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE);
-
-    const contourAreaArray = [];
-
-    for (let i = 0; i < contours.size(); i++) {
-        const cnt = contours.get(i);
-        const area = cv.contourArea(cnt, false)
-        if (area > 1000 || area < 10) {
-            continue
-        }
-
-        contourAreaArray.push({
-            area,
-            index: i
-        })
-    }
-
-    // cv.drawContours(preview, contours, -1, [255, 0, 0, 255], 1)
-
-    // return;
-    // contourAreaArray.sort(sortContourFunc)
-
-    let regionCnt;
-
-    let p = new cv.MatVector();
-
-    for (let cntArea of contourAreaArray) {
-        const cnt = contours.get(cntArea.index);
-
-        const peri = cv.arcLength(cnt, true)
-        let approx = new cv.Mat();
-        cv.approxPolyDP(cnt, approx, peri * 0.02, true)
-
-        if (approx.rows === 4) {
-            p.push_back(cnt);
-            // regionCnt = approx;
-            // break;
-        } else {
-            approx.delete()
-        }
-    }
-
-
-    cv.drawContours(preview, p, -1, [255, 0, 0, 255], 1)
-
-    if (!regionCnt) {
-        // we could not find a 4-side poly
-        // try other ways to find it
-
-        return;
-    }
-
-
-    contours.delete();
-    hierarchy.delete();
-
-
-    const data = regionCnt.data32S
-
-    regionCnt.delete();
-
-
-    const points = [{
-            x: data[0],
-            y: data[1]
-        }, {
-            x: data[2],
-            y: data[3]
-        },
-        {
-            x: data[4],
-            y: data[5]
-        }, {
-            x: data[6],
-            y: data[7]
-        }
-    ]
-
-    let {
-        tl,
-        tr,
-        br,
-        bl
-    } = sortCorners(points)
-
-    if (tr.x - tl.x <= width / 20 ||
-        Math.abs(tr.y - tl.y) >= height / 2 ||
-        br.x - tr.x >= 300 ||
-        Math.abs(br.y - tr.y) <= height / 5 ||
-        br.x - bl.x < width / 5 ||
-        Math.abs(bl.y - br.y) >= 300 ||
-
-        (tr.y - tl.y) / (br.y - bl.y) > 2 ||
-        (tr.y - tl.y) / (br.y - bl.y) < 0.5
-    ) {
-        return null;
-    }
-
-
-    // cv.drawContours(preview, regionCnt, -1, [255, 0, 0, 255], 1)
-
-    return {
-        tl,
-        tr,
-        br,
-        bl
-    };
 }
 
 
 function findBubbleRegion3(src) {
     let mat = new cv.Mat(src.size(), cv.CV_8UC1);
 
+    // mat = src.clone();
+    // cv.dilate(src, mat, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5) ));
     cv.erode(src, mat, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
-    cv.dilate(mat, mat, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
+    cv.dilate(mat, mat, cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5) ));
 
     cv.GaussianBlur(mat, mat, {
         width: 3,
         height: 3
     }, 0, 0, cv.BORDER_DEFAULT);
 
-    cv.adaptiveThreshold(mat, mat, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 11, 2);
-
-    // cv.GaussianBlur(src, mat, { width: 5, height: 5 }, 0, 0, cv.BORDER_DEFAULT);
-
-    // let canny = new cv.Mat();
-    // cv.Canny(src, mat, 160, 20);
-
-    // cv.adaptiveThreshold(mat, mat, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 35, 2);
-
+    cv.adaptiveThreshold(mat, mat, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 11, 3);
 
     let contours = new cv.MatVector();
     let hierarchy = new cv.Mat();
     cv.findContours(mat, contours, hierarchy, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE);
 
-    
+    const possibleTargets = [];
 
-    const contourAreaArray = [];
+    let p = new cv.MatVector();
 
-    // console.log(contours, contours.get(5), contours[5])
-
-    const minArea = width * height / 8 / 2
     for (let i = 0; i < contours.size(); i++) {
         const cnt = contours.get(i);
-        const area = cv.contourArea(cnt, false)
-        if (area > minArea) {
-            contourAreaArray.push({
-                area,
-                index: i
+
+        let region = checkIsTargetRegion(cnt);
+        if (region) {
+            possibleTargets.push({
+                area: region.area,
+                index: i,
+                points: region.points
             })
+
+            p.push_back(cnt);
         }
 
         cnt.delete()
     }
 
-    contourAreaArray.sort((a, b) => {
+    cv.drawContours(preview, p, -1, [0, 0, 255, 255], 1)
+
+    p.delete()
+
+    possibleTargets.sort((a, b) => {
         /* Sort largest value first */
         if (a.area < b.area) {
             return 1
@@ -755,62 +695,49 @@ function findBubbleRegion3(src) {
         return 0
     })
 
-    cv.drawContours(preview, contours, -1, [255, 0, 0, 255], 1)
 
+    // cv.drawContours(preview, contours, -1, [255, 0, 0, 255], 1)
 
-    // contours.delete();
-    // hierarchy.delete();
-    // mat.delete()
-
-    // console.log(contourAreaArray)
-
-    const possibleRectangles = [];
-
-    let p = new cv.MatVector();
-
-    for (let cntArea of contourAreaArray) {
-        const cnt = contours.get(cntArea.index);
-
-        const peri = cv.arcLength(cnt, true)
-        let approx = new cv.Mat();
-        cv.approxPolyDP(cnt, approx, peri * 0.02, true)
-
-        if (approx.rows === 4) {
-            const points = checkApproxIsRectangle(approx)
-
-            if (points) {
-                possibleRectangles.push(cntArea.index);
-
-                p.push_back(cnt);
-            }
-        }
-
-        approx.delete()
-        cnt.delete()
-
-        if (possibleRectangles.length >= 8) {
-            break;
-        }
-    }
-
-    cv.drawContours(preview, p, -1, [0, 255, 0, 255], 1)
-
-    p.delete()
 
     let targetPoints
 
-    for (let i of possibleRectangles) {
+    for (let target of possibleTargets) {
 
-        let index = +i;
+        let index = +target.index;
 
         // hierarchy: [Next, Previous, First_Child, Parent]
 
-        const ids = hierarchy.intPtr(0, index);
-        let nextId = ids[0];
-        let previousId = ids[1];
+        const [next, pre, firstChild, parent] = hierarchy.intPtr(0, index);
 
-        if (nextId != -1 && previousId != -1) continue;
+        // 只允许有一个答题卡框
+        // 如果兄弟轮廓 也可能是目标区域，则认为其不是 目标
 
+        if (next != -1) {
+            const cnt = contours.get(next);
+            if (checkIsTargetRegion(cnt)) {
+                console.log('has next')
+                cnt.delete();
+                continue
+            }
+
+            cnt.delete();
+        }
+
+        if (pre != -1) {
+            const cnt = contours.get(pre);
+            if (checkIsTargetRegion(cnt)) {
+                console.log('has pre')
+                cnt.delete();
+                continue
+            }
+
+            cnt.delete();
+        }
+
+        // cv.drawContours(preview, p, -1, [0, 0, 255, 255], 1)
+        // p.delete()
+
+       
         let k = index;
         let c = 0;
 
@@ -821,23 +748,9 @@ function findBubbleRegion3(src) {
 
         // if (hierarchy.intPtr(0, k)[2] != -1) c ++;
 
-        if (c >= 1) {
-            const cnt = contours.get(index);
-
-            const peri = cv.arcLength(cnt, true)
-            let approx = new cv.Mat();
-            cv.approxPolyDP(cnt, approx, peri * 0.02, true)
-
-            const points = checkApproxIsRectangle(approx)
-
-            approx.delete()
-            cnt.delete()
-
-            if (points) {
-                targetPoints = points
-                break
-            }
-            // break;
+        if (c >= 2) {
+            targetPoints = target.points
+            break;
         }
 
     }
@@ -849,23 +762,76 @@ function findBubbleRegion3(src) {
     return targetPoints
 }
 
+function checkIsTargetRegion(cnt) {
+    const area = cv.contourArea(cnt, false)
+
+    if (area < width * height / 9) {
+        // console.log('too small area')
+        return false
+    }
+
+    const peri = cv.arcLength(cnt, true)
+    let approx = new cv.Mat();
+    cv.approxPolyDP(cnt, approx, peri * 0.02, true)
+
+    const data = approx.data32S
+    const sides = approx.rows;
+
+    approx.delete()
+
+    if (sides !== 4) {
+        return false;
+    }
+
+    let points = [{
+        x: data[0],
+        y: data[1]
+    }, {
+        x: data[2],
+        y: data[3]
+    },
+    {
+        x: data[4],
+        y: data[5]
+    }, {
+        x: data[6],
+        y: data[7]
+    }]
+
+    points = sortCorners(points)
+
+    if (checkIsRectangle(points)) {
+        return {
+            points,
+            area
+        };
+    }
+}
+
+/**
+ * 根据面积判断是否可能是目标区域
+ */
+function checkContourByArea(cnt) {
+  
+}
+
 function checkApproxIsRectangle(approx) {
     const data = approx.data32S
 
     let points = [{
-            x: data[0],
-            y: data[1]
-        }, {
-            x: data[2],
-            y: data[3]
-        },
-        {
-            x: data[4],
-            y: data[5]
-        }, {
-            x: data[6],
-            y: data[7]
-        }
+        x: data[0],
+        y: data[1]
+    }, {
+        x: data[2],
+        y: data[3]
+    },
+    {
+        x: data[4],
+        y: data[5]
+    }, {
+        x: data[6],
+        y: data[7]
+    }
     ]
 
     points = sortCorners(points)
@@ -883,27 +849,35 @@ function checkIsRectangle(points) {
         bl
     } = points;
 
-    // console.log(br.x - tr.x >= 300 ,
-    //     Math.abs(br.y - tr.y) <= height / 5 ,
-    //     br.x - bl.x < width / 5 ,
-    //     Math.abs(bl.y - br.y) >= 300 ,
-
-    //     (tr.y - tl.y) / (br.y - bl.y) > 3 ,
-    //     (tr.y - tl.y) / (br.y - bl.y) < 0.3)
-
     if (
-        (tr.x - tl.x >= width - 10) ||
-        br.x - bl.x >= width - 10 ||
-        br.y - tr.y >= height - 10 ||
-        tr.x - tl.x <= width / 20 ||
-        Math.abs(tr.y - tl.y) >= height / 2 ||
-        br.x - tr.x >= 300 ||
-        Math.abs(br.y - tr.y) <= height / 5 ||
-        br.x - bl.x < width / 5 ||
-        Math.abs(bl.y - br.y) >= 300 ||
+        // 宽高不能过大
+        (tr.x - tl.x >= width - 50) ||
+        br.x - bl.x >= width - 50 ||
+        br.y - tr.y >= height - 50 ||
+        bl.y - tl.y >= height - 50 ||
 
-        (tr.y - tl.y) / (br.y - bl.y) > 3 ||
-        (tr.y - tl.y) / (br.y - bl.y) < 0.3
+        // 宽高不能过小
+        tr.x - tl.x < width / 4,
+        br.x - bl.x < width / 4,
+        br.y - tr.y < height / 4,
+        bl.y - tl.y < height / 4,
+
+        // 不能太过倾斜
+        Math.abs(br.x - tr.x) >= width / 4 ||
+        Math.abs(tr.y - tl.y) >= height / 4 ||
+        Math.abs(bl.y - br.y) >= height / 8 ||
+
+
+        // 两宽不能差距太大
+        // 两宽不能差距太大
+        (tr.x - tl.x) / (br.x - bl.x) > 3 ||
+        (tr.x - tl.x) / (br.x - bl.x) < 0.3 ||
+        (br.y - tr.y) / (bl.y - tl.y) > 3 ||
+        (br.y - tr.y) / (bl.y - tl.y) < 0.3 ||
+
+
+        (tr.y - tl.y) / (br.y - bl.y) > 3 
+        // (tr.y - tl.y) / (br.y - bl.y) < 0.3
     ) {
         return false;
     }
@@ -912,156 +886,8 @@ function checkIsRectangle(points) {
 }
 
 
-function findBubbleRegion(src) {
-    let mat = src //new cv.Mat(height, width, cv.CV_8UC1);
 
-    // cv.GaussianBlur(src, mat, { width: 1, height: 1 }, 0, 0, cv.BORDER_DEFAULT);
-
-    // let canny = new cv.Mat();
-    cv.Canny(src, mat, 160, 20);
-
-
-    cv.adaptiveThreshold(mat, mat, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY, 11, 2);
-
-    // cv.bitwise_not(mat, mat)
-
-    // let canny = new cv.Mat();
-
-    // cv.Canny(src, canny, 5, controls.cannyThreshold2, controls.cannyApertureSize, controls.cannyL2Gradient);
-
-    // cv.dilate(dstC1, dstC1, new cv.Mat(), {x: -1, y: -1})
-
-    // get the contour with four sides
-
-    function sortContourFunc(a, b) {
-        /* Sort largest value first */
-        if (a.area < b.area) {
-            return 1
-        } else if (a.area > b.area) {
-            return -1
-        }
-        return 0
-    }
-
-    let contours = new cv.MatVector();
-    let hierarchy = new cv.Mat();
-    cv.findContours(mat, contours, hierarchy, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE);
-
-    const contourAreaArray = [];
-
-    const minArea = width * height / 4
-    for (let i = 0; i < contours.size(); i++) {
-        const cnt = contours.get(i);
-        const area = cv.contourArea(cnt, false)
-        if (area < minArea) {
-            continue
-        }
-
-        contourAreaArray.push({
-            area,
-            index: i
-        })
-    }
-
-    // cv.drawContours(preview, contours, -1, [255, 0, 0, 255], 1)
-
-    contourAreaArray.sort(sortContourFunc)
-
-    let regionCnt;
-
-    let p = new cv.MatVector();
-
-    for (let cntArea of contourAreaArray) {
-        const cnt = contours.get(cntArea.index);
-
-        const peri = cv.arcLength(cnt, true)
-        let approx = new cv.Mat();
-        cv.approxPolyDP(cnt, approx, peri * 0.02, true)
-
-        if (approx.rows === 4) {
-            p.push_back(cnt);
-            // if (!regionCnt) regionCnt = approx;
-            // else {
-            //     regionCnt = approx;
-            //     break;
-            // }
-            regionCnt = approx;
-            break;
-        } else {
-            approx.delete()
-        }
-    }
-
-    cv.drawContours(preview, p, -1, [255, 0, 0, 255], 1)
-
-    p.delete()
-
-
-    if (!regionCnt) {
-        // we could not find a 4-side poly
-        // try other ways to find it
-
-        return;
-    }
-
-
-    contours.delete();
-    hierarchy.delete();
-
-
-    const data = regionCnt.data32S
-
-    regionCnt.delete();
-
-
-    const points = [{
-            x: data[0],
-            y: data[1]
-        }, {
-            x: data[2],
-            y: data[3]
-        },
-        {
-            x: data[4],
-            y: data[5]
-        }, {
-            x: data[6],
-            y: data[7]
-        }
-    ]
-
-    let {
-        tl,
-        tr,
-        br,
-        bl
-    } = sortCorners(points)
-
-    if (tr.x - tl.x <= width / 20 ||
-        Math.abs(tr.y - tl.y) >= height / 2 ||
-        br.x - tr.x >= 300 ||
-        Math.abs(br.y - tr.y) <= height / 5 ||
-        br.x - bl.x < width / 5 ||
-        Math.abs(bl.y - br.y) >= 300 ||
-
-        (tr.y - tl.y) / (br.y - bl.y) > 2 ||
-        (tr.y - tl.y) / (br.y - bl.y) < 0.5
-    ) {
-        return null;
-    }
-
-
-    // cv.drawContours(preview, regionCnt, -1, [255, 0, 0, 255], 1)
-
-    return {
-        tl,
-        tr,
-        br,
-        bl
-    };
-}
-
-function perspectiveTransform(src, pts) {
+function perspectiveTransform(src, pts, destRect=null) {
 
     let {
         tl,
@@ -1070,38 +896,32 @@ function perspectiveTransform(src, pts) {
         bl
     } = pts
 
-    // let [tl, tr, br, bl] = rect
 
-    // compute the width of the new image, which will be the
-    // maximum distance between bottom-right and bottom-left
-    // x-coordiates or the top-right and top-left x-coordinates
-    let widthA = Math.sqrt(Math.pow(br.x - bl.x, 2) + Math.pow(br.y - bl.y, 2))
-    let widthB = Math.sqrt(Math.pow(tr.x - tl.x, 2) + Math.pow(tr.y - tl.y, 2))
-    let maxWidth = Math.max(Math.floor(widthA), Math.floor(widthB))
-    //
-    // compute the height of the new image, which will be the
-    // maximum distance between the top-right and bottom-right
-    // y-coordinates or the top-left and bottom-left y-coordinates
-    let heightA = Math.sqrt(Math.pow(tr.x - br.x, 2) + Math.pow(tr.y - br.y, 2))
-    let heightB = Math.sqrt(Math.pow(tl.x - bl.x, 2) + Math.pow(tl.y - bl.y, 2))
-    let maxHeight = Math.max(Math.floor(heightA), Math.floor(heightB))
+    if (!destRect) {
+    
+        let widthA = Math.sqrt(Math.pow(br.x - bl.x, 2) + Math.pow(br.y - bl.y, 2))
+        let widthB = Math.sqrt(Math.pow(tr.x - tl.x, 2) + Math.pow(tr.y - tl.y, 2))
+        let maxWidth = Math.max(Math.floor(widthA), Math.floor(widthB))
 
-    // now that we have the dimensions of the new image, construct
-    // the set of destination points to obtain a "birds eye view",
-    // (i.e. top-down view) of the image, again specifying points
-    // in the top-left, top-right, bottom-right, and bottom-left
-    // order
-    let dstRect = [
-        [0, 0],
-        [maxWidth - 1, 0],
-        [maxWidth - 1, maxHeight - 1],
-        [0, maxHeight - 1]
-    ]
+        let heightA = Math.sqrt(Math.pow(tr.x - br.x, 2) + Math.pow(tr.y - br.y, 2))
+        let heightB = Math.sqrt(Math.pow(tl.x - bl.x, 2) + Math.pow(tl.y - bl.y, 2))
+        let maxHeight = Math.max(Math.floor(heightA), Math.floor(heightB))
+
+        destRect =  [0, 0, maxWidth, 0, maxWidth, maxHeight, 0, maxHeight];
+    }
+
 
 
     let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y])
-    let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, maxWidth - 1, 0, maxWidth - 1, maxHeight - 1, 0, maxHeight - 1])
+    let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, destRect)
+
     let M = cv.getPerspectiveTransform(srcTri, dstTri)
+
+    // let dstTri2 = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, maxWidth - 1, 0, maxWidth - 1, maxHeight - 1, 0, maxHeight - 1])
+    // const result = cv.findHomography(src, dstTri2)
+    // console.log('++ ', result)
+
+
     let dsize = new cv.Size(src.cols, src.rows)
     let warped = new cv.Mat()
     cv.warpPerspective(src, warped, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar())
@@ -1112,8 +932,8 @@ function perspectiveTransform(src, pts) {
 
     return {
         warped: warped,
-        width: maxWidth,
-        height: maxHeight
+        width: destRect[2] - destRect[0],
+        height: destRect[5] - destRect[1]
     }
 
 }
@@ -1252,5 +1072,5 @@ function opencvIsReady() {
         startCamera();
     })
 
-    
+
 }

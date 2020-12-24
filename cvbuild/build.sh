@@ -40,7 +40,7 @@ git clone -b $VERSION https://github.com/opencv/opencv.git --depth=1 $TEMP_DIR/o
     docker run --rm -v $(pwd)/${TEMP_DIR}:/src \
         -e EMSCRIPTEN=/emsdk/upstream/emscripten \
         emscripten/emsdk python3 /src/opencv/platforms/js/build_js.py /src/output \
-        --build_wasm --threads --build_perf --build_doc --clean_build_dir --enable_exception
+        --build_wasm --threads --clean_build_dir --enable_exception
 
 # fi
 

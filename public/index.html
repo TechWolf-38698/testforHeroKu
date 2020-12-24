@@ -14,22 +14,24 @@
     <div id="container" class="">
 
         <div>
-            <video id="video" autoplay="autoplay" playsinline class="absolute-position" style="width:200px;"></video>
+            <video id="video" autoplay="autoplay" playsinline class="" style="position: fixed; right: 0;width:200px; visibility: hidden;"></video>
         </div>
 
         <canvas style="position:fixed; left:-1000px; visibility: hidden" id="dummy"></canvas>
 
         <div class="flex flex-row">
 
-            <div class="">
+            <div style="scale: 0.6;">
                 <canvas id="canvas"></canvas>
             </div>
 
-            <div class="">
-                <canvas id="preview"></canvas>
-            </div>
-
+          
         </div>
+
+        <div style="position:fixed; right: 0;top:10px;">
+            <canvas id="preview"></canvas>
+        </div>
+
 
 
     </div>
@@ -45,30 +47,10 @@
         });
     </script>
 
-    <script>
-        var Module = {
-        //   wasmBinaryFile: './build/wasm/opencv_js.wasm',
-          _main: function() {},
-          onRuntimeInitialized: function() {opencvIsReady();}
-        };
+    
+    <!-- <script async src="./build/wasm/opencv.js" onload="opencvIsReady()"></script> -->
 
-        // Set paths configuration
-        let pathsConfig = {
-            wasm: "./js/newbuild/opencv.js",
-            threads: "./js/newbuild/opencv_js.js",
-            // simd: "../../build_simd/opencv.js",
-            // threadsSimd: "../../build_mtSIMD/opencv.js",
-        }
-        // Load OpenCV.js and use the pathsConfiguration and main function as the params.
-        // loadOpenCV(pathsConfig, () => {
-        //     console.log('LOADED')
-        //     opencvIsReady();
-        // });
-    </script>
-    <!-- <script async src="./js/newbuild/opencv_threads.js" ></script> -->
-    <!-- <script async src="./build/asm.js/opencv.js" onload="opencvIsReady()"></script> -->
-
-    <script async="" type="text/javascript" src="./js/build_with_only_2_lib/opencv_js.js"></script>
+    <script async="" type="text/javascript" src="./js/build/opencv_js.js"></script>
 
 
     <button onclick="onClickProcess()"
